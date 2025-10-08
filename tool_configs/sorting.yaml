@@ -1,0 +1,44 @@
+tool_list:
+  - name: compare
+    # description when using the entry action
+    entry_desc: " compare"
+    output_template: ": %s\n"
+    cpo_words: [" compare"]
+    # actions that can be used in the tool
+    action_groups:
+      # basic calculator
+      - name: items
+        actions:
+          - desc: ' A'
+          - desc: ' B'
+          - desc: ' C'
+          - desc: ' D'
+          - desc: ' E'
+  - name: swap
+    # description when using the entry action
+    entry_desc: " swap"
+    output_template: " => %s\n"
+    cpo_words: [" swap"]
+    # actions that can be used in the tool
+    action_groups:
+      # basic calculator
+      - name: items
+  - name: check
+    # description when using the entry action
+    entry_desc: " check if"
+    output_template: ": %s\n"
+    cpo_words: [" check"]
+    # actions that can be used in the tool
+    action_groups:
+      # basic calculator
+      - name: items
+      - name: properties
+        actions:
+          - desc: ' is negative'
+            init_weight_with: 1
+          - desc: ' is positive'
+            init_weight_with: 1
+          - desc: ' is even'
+            init_weight_with: 1
+          - desc: ' is odd'
+            init_weight_with: 1

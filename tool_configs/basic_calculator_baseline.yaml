@@ -1,0 +1,8 @@
+tool_list:
+  - name: calculator
+    earl: false
+    entry_desc: " <calculator>"
+    exit_desc: " </calculator>"
+    output_template: " <result> %s </result>"
+    cpo_words: [" <"]
+    actions: [" +", " -", " *", " /", " ", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", " (", ")"]

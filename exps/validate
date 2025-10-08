@@ -1,0 +1,10 @@
+cd ./verl
+
+unset ROCR_VISIBLE_DEVICES
+echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+
+apptainer exec --nv envs/verl.sif bash -c "
+    ray start --head --port=6383 && \
+    set -x && \
+    python exps/run_validation.py$@
+"

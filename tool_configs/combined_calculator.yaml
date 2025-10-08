@@ -1,0 +1,36 @@
+tool_list:
+  - name: calculator
+    # if training the action of entering mode
+    train_entry: false
+    # description when using the entry action
+    entry_desc: " calculate "
+    output_template: "%s\n"
+    cpo_words: [" calculate"]
+    # actions that can be used in the tool
+    action_groups:
+      # basic calculator
+      - name: basic
+        actions:
+          - desc: ' + '
+          - desc: ' - '
+          - desc: ' * '
+          - desc: ' / '
+          - desc: ' ('
+          - desc: ')'
+          - desc: '0'
+          - desc: '1'
+          - desc: '2'
+          - desc: '3'
+          - desc: '4'
+          - desc: '5'
+          - desc: '6'
+          - desc: '7'
+          - desc: '8'
+          - desc: '9'
+          - desc: '.'
+        trainable: true
+      # actions that exit tool mode
+      - name: exit
+        actions:
+          - desc: ' = '
+        trainable: true

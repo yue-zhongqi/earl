@@ -1,0 +1,25 @@
+tool_list:
+  - name: compare
+    earl: false
+    entry_desc: " <compare>"
+    exit_desc: " </compare>"
+    output_template: " <result> %s </result>"
+    cpo_words: [" <compare"]
+    actions: [" A", " B", " C", " D", " E", ","]
+  - name: swap
+    earl: false
+    entry_desc: " <swap>"
+    exit_desc: " </swap>"
+    output_template: " <result> %s </result>"
+    cpo_words: [" <swap"]
+    actions: [" A", " B", " C", " D", " E", ","]
+  - name: check
+    earl: false
+    entry_desc: " <check>"
+    exit_desc: " </check>"
+    output_template: " <result> %s </result>"
+    cpo_words: [" <check"]
+    actions: [" A", " B", " C", " D", " E", ",", " negative", " positive", " even", " odd"]
+
+  # <compare> A, B </compare> <result> A < B </result>
+  # <swap> A, B </swap> <result> B, A </result>
