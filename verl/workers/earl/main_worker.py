@@ -187,7 +187,6 @@ class EarlActorRolloutRefWorker(ActorRolloutRefWorker):
                         output_hidden_states = (
                             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
                         )
-                        # breakpoint()
                         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
                         outputs = self.model(
                             input_ids=input_ids,
@@ -207,7 +206,6 @@ class EarlActorRolloutRefWorker(ActorRolloutRefWorker):
                         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
                         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
                         logits = self.lm_head(hidden_states[:, slice_indices, :])
-                        # breakpoint()
                         extra_logits = self.earl_head(hidden_states[:, slice_indices, :])
                         loss = None
                         logits = torch.cat([logits, extra_logits], dim=-1)
@@ -335,21 +333,6 @@ class EarlActorRolloutRefWorker(ActorRolloutRefWorker):
         else:
             raise NotImplementedError(f"not implement {fsdp_strategy}")
 
-        # if role == "actor":
-        #     self.earl_head = FSDP(
-        #         earl_head,
-        #         cpu_offload=cpu_offload,
-        #         param_init_fn=init_fn,
-        #         use_orig_params=False,
-        #         auto_wrap_policy=auto_wrap_policy,
-        #         device_id=get_device_id(),
-        #         sharding_strategy=sharding_strategy,  # zero3
-        #         mixed_precision=mixed_precision,
-        #         sync_module_states=True,
-        #         device_mesh=self.device_mesh,
-        #         forward_prefetch=self.config.actor.fsdp_config.forward_prefetch,
-        #     )
-
         if enable_activation_offload:
             enable_activation_offloading(actor_module_fsdp, fsdp_strategy, enable_gradient_checkpointing)
 
@@ -360,7 +343,6 @@ class EarlActorRolloutRefWorker(ActorRolloutRefWorker):
             from verl.utils.torch_functional import get_constant_schedule_with_warmup, get_cosine_schedule_with_warmup
             # get trainable parameters
             trainable_params = itertools.chain(
-                # (p for p in self.earl_head.parameters() if p.requires_grad),
                 (p for p in actor_module_fsdp.parameters() if p.requires_grad),
             )
             actor_optimizer = optim.AdamW(
@@ -551,7 +533,6 @@ class EarlActorRolloutRefWorker(ActorRolloutRefWorker):
         if self.tool_config.total_size > 0:
             # add earl head to rollout model
             rollout_model = rollout_sharding_manager.model_runner.model
-            # breakpoint()
             temp_config = self.model_config.copy()
             temp_config.init_from_base = False  # this prevents error in model creation; weight is synced with actor by rollout_sharding_manager
             earl_head = create_earl_head(
@@ -566,7 +547,6 @@ class EarlActorRolloutRefWorker(ActorRolloutRefWorker):
                     self.tool_config,
                     rollout_model.earl_head
                 )
-        # breakpoint()
         # set VLLM sampler to EaRL sampler
         # set VLLM GPU runner to EaRL GPU runner
         log_gpu_memory_usage("After building sharding manager", logger=logger)
@@ -575,7 +555,6 @@ class EarlActorRolloutRefWorker(ActorRolloutRefWorker):
     # TODO: Implement the save and load checkpoint methods
     @register(dispatch_mode=Dispatch.ONE_TO_ALL)
     def save_checkpoint(self, local_path, hdfs_path=None, global_step=0, max_ckpt_to_keep=None):
-        # breakpoint()
         return super().save_checkpoint(local_path, hdfs_path, global_step, max_ckpt_to_keep)
     
     @register(dispatch_mode=Dispatch.ONE_TO_ALL)
@@ -613,7 +592,6 @@ class EarlActorRolloutRefWorker(ActorRolloutRefWorker):
     @register(dispatch_mode=Dispatch.DP_COMPUTE_PROTO)
     @DistProfiler.annotate(color="blue")
     def compute_log_prob(self, data: DataProto):
-        # self.debug_batch(data.batch)
         return super().compute_log_prob(data)
     
     @register(dispatch_mode=Dispatch.DP_COMPUTE_PROTO)
@@ -655,8 +633,6 @@ class EarlActorRolloutRefWorker(ActorRolloutRefWorker):
             all_pos.append(call_tool_pos)
             all_tool_ids.append(torch.tensor([action_id]).unsqueeze(1).repeat(len(data), 1))
 
-        # breakpoint()
-        # torch.distributed.barrier()
         all_pos = torch.cat(all_pos, dim=1)
         all_tool_ids = torch.cat(all_tool_ids, dim=1)
         output["call_tool_pos"] = all_pos
@@ -689,11 +665,9 @@ class EarlActorRolloutRefWorker(ActorRolloutRefWorker):
         timing_generate = {}
         with self.rollout_sharding_manager:
             log_gpu_memory_usage("After entering rollout sharding manager", logger=logger)
-            # breakpoint()
             prompts = self.rollout_sharding_manager.preprocess_data(prompts)
             with simple_timer("compute_gt_sequences", timing_generate):
                 output = self.rollout.compute_gt_sequences(prompts=prompts)
-            # breakpoint()
             log_gpu_memory_usage("After rollout generation", logger=logger)
 
             output = self.rollout_sharding_manager.postprocess_data(output)
@@ -737,11 +711,9 @@ class EarlActorRolloutRefWorker(ActorRolloutRefWorker):
                 rewrite_mask[id_to_indices[uid]] = True
         with self.rollout_sharding_manager:
             log_gpu_memory_usage("After entering rollout sharding manager", logger=logger)
-            # breakpoint()
             data = self.rollout_sharding_manager.preprocess_data(data)
             with simple_timer("rewrite_sequence", timing_generate):
                 output = self.rollout.rewrite_sequences(prompts=data, mask=rewrite_mask)
-            # breakpoint()
             log_gpu_memory_usage("After rollout generation", logger=logger)
             output = self.rollout_sharding_manager.postprocess_data(output)
 

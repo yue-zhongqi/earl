@@ -67,11 +67,9 @@ class EarlLogitsProcessor(LogitsProcessor):
         """
         # Implement EARL-specific logits processing logic here
         # For now, we just call the parent method
-        # breakpoint()
         logits = super().forward(lm_head, hidden_states, sampling_metadata, embedding_bias)
         earl_logits = self.earl_head(hidden_states) if self.earl_head else None
         # concat logits with EARL logits if needed
-        # breakpoint()
         if earl_logits is not None:
             logits = torch.cat((logits, earl_logits), dim=-1)
         return logits

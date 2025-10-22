@@ -216,7 +216,6 @@ class RLHFDataset(Dataset):
         row_dict: dict = self.dataframe[item]
         messages = self._build_messages(row_dict)
         model_inputs = {}
-        # breakpoint()
         if self.processor is not None:
             from verl.utils.dataset.vision_utils import process_image, process_video
 

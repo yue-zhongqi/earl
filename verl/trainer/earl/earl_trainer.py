@@ -79,7 +79,6 @@ class EarlTrainingScheduler():
         if len(self.training_tools) == 1:
             return self.training_tools[0]
         else:
-            # breakpoint()
             total = sum([max(0.0, v) for v in self.avg_intervene_adv.values()])
             if total < 1e-5:
                 probs = [1.0 / len(self.training_tools) for _ in self.training_tools]
@@ -307,11 +306,9 @@ class ExpandedActionRLTrainer(RayPPOTrainer):
                 test_output_gen_batch_padded = self.async_rollout_manager.generate_sequences(test_gen_batch_padded)
                 self.async_rollout_manager.sleep()
 
-            # breakpoint()
             # unpad
             test_output_gen_batch = unpad_dataproto(test_output_gen_batch_padded, pad_size=pad_size)
             print("validation generation end")
-            # breakpoint()
             # Store generated outputs
             output_ids = test_output_gen_batch.batch["responses"]
             output_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in output_ids]
@@ -320,9 +317,7 @@ class ExpandedActionRLTrainer(RayPPOTrainer):
             test_batch = test_batch.union(test_output_gen_batch)
 
             # evaluate using reward_function
-            # breakpoint()
             update_interaction_kwargs(test_batch)
-            # breakpoint()
             result = self.val_reward_fn(test_batch, return_dict=True)
             reward_tensor = result["reward_tensor"]
             test_batch.batch["rewards"] = reward_tensor.sum(dim=-1)
@@ -364,7 +359,6 @@ class ExpandedActionRLTrainer(RayPPOTrainer):
             assert len(lst) == 0 or len(lst) == len(sample_scores), f"{key_info}: {len(lst)=}, {len(sample_scores)=}"
 
         data_sources = np.concatenate(data_source_lst, axis=0)
-        # breakpoint()
         data_src2var2metric2val = process_validation_metrics(data_sources, sample_inputs, reward_extra_infos_dict)
         metric_dict = {}
         for data_source, var2metric2val in data_src2var2metric2val.items():
@@ -384,7 +378,6 @@ class ExpandedActionRLTrainer(RayPPOTrainer):
         return metric_dict
     
     def fit(self):
-        # breakpoint()
         loss_mode = self.config.actor_rollout_ref.earl.training.loss
         need_rollout = loss_mode in ['rl']
         need_reward_advantage = loss_mode in ['rl', 'cross_entropy_reg']
@@ -443,7 +436,6 @@ class ExpandedActionRLTrainer(RayPPOTrainer):
                 metrics = {}
                 timing_raw = {}
                 batch: DataProto = DataProto.from_single_dict(batch_dict)
-                # breakpoint()
                 # pop those keys for generation
                 batch_keys_to_pop = ["input_ids", "attention_mask", "position_ids"]
                 non_tensor_batch_keys_to_pop = ["raw_prompt_ids"]
@@ -469,7 +461,6 @@ class ExpandedActionRLTrainer(RayPPOTrainer):
                     
                     ############## Step 1: Rollout Generation ##############
                     with marked_timer("gen", timing_raw, color="red"):
-                        # breakpoint()
                         if not need_rollout:
                             # gts = [batch.non_tensor_batch["extra_info"][i]["expr"] for i in range(len(batch.batch))]
                             gen_batch_output = self.actor_rollout_wg.compute_gt_sequences(gen_batch)
@@ -504,14 +495,12 @@ class ExpandedActionRLTrainer(RayPPOTrainer):
                     # repeat to align with repeated responses in rollout
                     batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
                     batch = batch.union(gen_batch_output)
-                    # breakpoint()
                     batch.batch["response_mask"] = compute_response_mask(batch)
                     # Balance the number of valid tokens across DP ranks.
                     # NOTE: This usually changes the order of data in the `batch`,
                     # which won't affect the advantage calculation (since it's based on uid),
                     # but might affect the loss calculation (due to the change of mini-batching).
                     # TODO: Decouple the DP balancing and mini-batching.
-                    # breakpoint()
                     if self.config.trainer.balance_batch:
                         self._balance_batch(batch, metrics=metrics)
 
@@ -520,7 +509,6 @@ class ExpandedActionRLTrainer(RayPPOTrainer):
 
                     ############## Step 2: Computing Rewards ##############
                     if need_reward_advantage:
-                        # breakpoint()
                         update_interaction_kwargs(batch)    # for state-specific reward computation
                         # print_interaction_kwargs(batch, "normal rollout before reward computation")
                         with marked_timer("reward", timing_raw, color="yellow"):
@@ -557,21 +545,18 @@ class ExpandedActionRLTrainer(RayPPOTrainer):
                             sampled_tool_name = self.earl_scheduler.sample_intervene_tool_name()
                             batch.meta_info['call_tool_name'] = sampled_tool_name
                             tool_scores = self.actor_rollout_wg.compute_tool_scores(batch)
-                            # breakpoint()
                             batch = batch.union(tool_scores)
 
                             # Rewrite response
                             rewrite_batch = self.actor_rollout_wg.rewrite_sequences(batch)
                             # print_interaction_kwargs(rewrite_batch, "rewrite batch")
                             batch.batch.update(rewrite_batch.batch)
-                            # breakpoint()
                             batch.non_tensor_batch.update({'interaction_kwargs': rewrite_batch.non_tensor_batch['interaction_kwargs']})
                             update_interaction_kwargs(rewrite_batch)
                             update_interaction_kwargs(batch)
                             # print_interaction_kwargs(batch, "batch after updated with rewrite")
                             # print_interaction_kwargs(rewrite_batch, "rewrite_batch after updated with rewrite; before reward compute")
                             reward_w_tools, _ = compute_reward(rewrite_batch, self.reward_fn)
-                            # breakpoint()
                             avg_adv = (reward_w_tools.sum(dim=-1)[batch.batch['rewrite_mask']] - batch.batch["token_level_scores"].sum(dim=-1)[batch.batch['rewrite_mask']]).mean().item()
                             self.earl_scheduler.update_intervene_adv(sampled_tool_name, avg_adv)
                             batch.batch["token_level_scores_w_tools"] = reward_w_tools
@@ -634,7 +619,6 @@ class ExpandedActionRLTrainer(RayPPOTrainer):
 
                         with marked_timer("adv", timing_raw, color="brown"):
                             # compute advantages, executed on the driver process
-                            # breakpoint()
                             norm_adv_by_std_in_grpo = self.config.algorithm.get("norm_adv_by_std_in_grpo", True)  # GRPO adv normalization factor
                             batch = compute_advantage(
                                 batch,
@@ -646,7 +630,6 @@ class ExpandedActionRLTrainer(RayPPOTrainer):
                                 multi_turn=self.config.actor_rollout_ref.rollout.multi_turn.enable,
                                 config=self.config.algorithm,
                             )
-                        # breakpoint()
 
                         # update critic
                         if self.use_critic:
@@ -689,7 +672,6 @@ class ExpandedActionRLTrainer(RayPPOTrainer):
                             if is_last_step:
                                 last_val_metrics = val_metrics
                         metrics.update(val_metrics)
-                        # breakpoint()
                         val_key = [key for key in val_metrics.keys() if 'reward/mean' in key][0]
                         val_result = val_metrics[val_key]
                         if val_result > val_best and self.config.trainer.save_best:

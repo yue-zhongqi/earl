@@ -21,7 +21,6 @@ class Tool(ABC):
             if not self._forbid(parsed_seq, name.strip()):
                 allowed.append(action_id)
         total_size = self.tool_config.org_vocab_size
-        # breakpoint()
         mask = torch.zeros(total_size, dtype=torch.bool)
         mask[allowed] = True
         return mask
@@ -37,7 +36,6 @@ class Tool(ABC):
         return mask
     
     def execute(self, output_seq, exit_token=None, interaction_kwargs=None):
-        # breakpoint()
         if len(output_seq) == 0:
             return " "
         if output_seq[0] in self.tool_config.tool_action_ids:
@@ -74,7 +72,6 @@ class Tool(ABC):
     
     def _parse_non_earl(self, output_seq):
         parsed_seq = []
-        # breakpoint()
         for i, token_id in enumerate(output_seq):
             matched = False
             for name, action_id in self.desc_map.items():
@@ -85,14 +82,12 @@ class Tool(ABC):
                     parsed_seq.append(name.strip())  # remove spaces around
                     break
             if not matched:
-                # breakpoint()
                 raise ValueError(f"Token ID {token_id} does not belong to non-EARL tool {self.tool_name}")
         return parsed_seq
 
     def _get_allowed_desc(self, output_seq):
         parsed_seq = self._parse(output_seq)
         parsed_seq = [seq.strip() for seq in parsed_seq]
-        # breakpoint()
         return [desc for desc in self.desc_list if not self._forbid(parsed_seq, desc.strip())]
 
     

@@ -121,7 +121,6 @@ def build_tool_config(org_vocab_size: int, starting_mode: str, tool_config: Dict
         tool_idx += 1
         # end of tool loop
     config.total_size = current_id - org_vocab_size
-    # breakpoint()
     return config
 
 def get_expansion_size(earl_config):
@@ -206,15 +205,12 @@ def find_completed_non_earl_tool_name(config: ToolConfig, output_seq):
                 last_entry = find_last_sublist(output_seq, entry_seq)
             else:
                 last_entry = find_last_sublist(output_seq[last_last_exit:], entry_seq)
-            # breakpoint()
             if last_entry >= 0 and last_exit >= 0 and last_entry < last_exit and (last_exit + len(exit_seq) == len(output_seq)):
-                # breakpoint()
                 last_entry += (last_last_exit if last_last_exit >=0 else 0)
                 output_name = name
                 tool_call_seq = output_seq[last_entry+len(entry_seq):last_exit]
                 for aid in tool_call_seq:
                     if aid not in config.tool_action_id_to_non_earl_actions[action_id].values():
-                        # breakpoint()
                         raise ValueError(f"Token ID {aid} in non-EARL tool call does not belong to tool {name}")
                 break
     return output_name, tool_call_seq
@@ -238,7 +234,6 @@ def get_allowed_token_ids_mask(
     """
     masks = []
     total_size = tool_config.total_size + tool_config.org_vocab_size
-    # all_output_str = tool_config.tokenizer.batch_decode(sampling_metadata.output_token_ids)
     for output_seq in sampling_metadata.output_token_ids:
         # handle starting mode
         if starting_mode != 'default' and len(output_seq) == 0:
@@ -279,7 +274,6 @@ def get_allowed_token_ids_mask(
             tool_name, last_tool_index = find_active_non_earl_tool_name(tool_config, output_seq)
             if tool_name is not None:
                 # non-earl tool mode
-                # breakpoint()
                 action_id = tool_config.tool_name_to_action_id[tool_name]
                 exit_seq = tool_config.tool_action_id_to_exit_seq[action_id]
                 output_seq = output_seq[last_tool_index:] # non-EARL tool action ids are already removed
@@ -303,7 +297,6 @@ def get_allowed_token_ids_mask(
                 masks.append(mask)
         else:
             # earl tool mode
-            # breakpoint()
             masks.append(tool.get_allowed_token_ids_mask(output_seq))
     return torch.stack(masks, dim=0)
 

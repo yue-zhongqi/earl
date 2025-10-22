@@ -110,10 +110,6 @@ def generate_sudoku(n=1000, min_difficulty=0.1, d1=3, d2=2):
         puzzle = Sudoku(d1, d2, seed=random.randint(1, 100000)).difficulty(difficulty)
         solution = puzzle.solve().board
         puzzle_str = str(puzzle.board)
-        # if puzzle_str in problems:
-        #     print("Duplicate puzzle found")
-        # else:
-        #     problems.append(puzzle_str)
         success = False
         while not success:
             difficulty = random.uniform(min_difficulty, 0.7)
@@ -324,7 +320,6 @@ if __name__ == "__main__":
             use_tool = use_tool and global_enable_tool
             # if exists
             if os.path.exists(f"{dir}/train.parquet") and os.path.exists(f"{dir}/test.parquet"):
-                # breakpoint()
                 print(f"Dataset {d_name} already exists, skipping generation.")
                 # load train and test parquet and print the max length of prompt
                 train_loaded = Dataset.from_parquet(os.path.join(dir, "train.parquet"))

@@ -226,7 +226,6 @@ def compute_grpo_outcome_advantage(
         Returns: `(torch.Tensor)`
             shape is (bs, response_length)
     """
-    # breakpoint()
     scores = token_level_rewards.sum(dim=-1)
 
     id2score = defaultdict(list)
@@ -286,7 +285,6 @@ def compute_cpo_outcome_advantage(
         Returns: `(torch.Tensor)`
             shape is (bs, response_length)
     """
-    # breakpoint()
     scores = token_level_rewards.sum(dim=-1)
     scores_w_tools = token_level_rewards_w_tools.sum(dim=-1)
     scores_wo_tools = token_level_rewards.sum(dim=-1)
@@ -667,7 +665,6 @@ def compute_policy_loss(
             Aggregation mode for `agg_loss`. Defaults to "token-mean".
     """
     assert clip_ratio_c > 1.0, "The lower bound of the clip_ratio_c for dual-clip PPO should be greater than 1.0," + f" but get the value: {clip_ratio_c}."
-    # breakpoint()
     negative_approx_kl = log_prob - old_log_prob
     # Clamp negative_approx_kl for stability
     negative_approx_kl = torch.clamp(negative_approx_kl, min=-20.0, max=20.0)
@@ -891,7 +888,6 @@ def compute_value_loss(vpreds: torch.Tensor, returns: torch.Tensor, values: torc
     """
     vpredclipped = verl_F.clip_by_value(vpreds, values - cliprange_value, values + cliprange_value)
     vf_losses1 = (vpreds - returns) ** 2
-    # breakpoint()
     vf_losses2 = (vpredclipped - returns) ** 2
     clipped_vf_losses = torch.max(vf_losses1, vf_losses2)
     vf_loss = 0.5 * agg_loss(loss_mat=clipped_vf_losses, loss_mask=response_mask, loss_agg_mode=loss_agg_mode)

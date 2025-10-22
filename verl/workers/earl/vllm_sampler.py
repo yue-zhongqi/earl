@@ -60,7 +60,6 @@ class EarlSampler(Sampler):
         """
         # Implement EARL-specific sampling logic here
         # For now, we just call the parent method
-        # breakpoint()
         # print(f"Sampling device {get_device_id()}: {sampling_metadata.output_token_ids[0]}.")
         return super().forward(logits, sampling_metadata)
     
@@ -74,7 +73,6 @@ class EarlSampler(Sampler):
             mask = ~get_allowed_token_ids_mask(
                 self.tool_config, self.tools, sampling_metadata, self.starting_mode
             )
-            # breakpoint()
             logits.masked_fill_(mask.to(logits.device), float("-inf"))
         return logits
     
@@ -111,14 +109,12 @@ class EarlSampler(Sampler):
         # Apply top_k and/or top_p.
         # print(f"Applying top_k: {sampling_metadata.top_k}, top_p: {sampling_metadata.top_p}")
         # sampling_metadata.top_k = 1
-        # breakpoint()
         random_sampled = self.topk_topp_sampler(
             logits,
             sampling_metadata.generators,
             sampling_metadata.top_k,
             sampling_metadata.top_p,
         )
-        # random_sampled = self.greedy_sample(logits)
 
         if greedy_sampled is None:
             return random_sampled

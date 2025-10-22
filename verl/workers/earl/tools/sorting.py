@@ -65,7 +65,6 @@ class Swap(Tool):
         if len(action_seq) == 0:
             interaction_kwargs['state'] = interaction_kwargs['symbols'].copy()
         else:
-            # breakpoint()
             if tool_config.id_to_str=={}:
                 # get swap action id
                 swap_action_id=tool_config.tool_name_to_action_id['swap']
@@ -78,12 +77,10 @@ class Swap(Tool):
                 state = interaction_kwargs['symbols'].copy()
                 swap_params = []
                 swapping = 0
-                # breakpoint()
                 action_seq_len=len(action_seq)
                 if action_seq_len>=9:
                     for i in range(action_seq_len):
                         if action_seq[i:i+3] == entry_swap_action_id and action_seq[i+6:i+9] == exit_swap_action_id:
-                            # breakpoint()
                             for sym,sym_index in tool_config.tool_action_id_to_non_earl_actions[swap_action_id].items():
                                 if sym_index==action_seq[i+3]:
                                     sym_1=sym
@@ -108,7 +105,6 @@ class Swap(Tool):
                         swap_params.append(tool_config.id_to_str[action_id].strip())
                         swapping -= 1
                     if len(swap_params) == 2:
-                        # breakpoint()
                         sym_1 = swap_params[0]
                         sym_2 = swap_params[1]
                         state = Swap._swap(state, sym_1, sym_2)

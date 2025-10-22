@@ -5,7 +5,6 @@ tool_list:
     exit_desc: " </calculator>"
     output_template: " <result> %s </result>"
     is_sft_mode: "sft"
-    # cpo_words: [" <calculator"]
     cpo_words: [" <"]
     actions: [" +", " -", " *", " /", " ", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", " (", " )", ".", ","]
     # “，” is needed for sft to handle random patterns such as 4,000 + 5,000

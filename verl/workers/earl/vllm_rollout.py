@@ -133,7 +133,6 @@ class EarlRequestTracker:
 
     def update_request(self, req_id, chosen_action, logprobs):
         if self.tool_config.is_sft_mode=="default":
-            # breakpoint()
             assert len(chosen_action) == 1, 'Chosen action must be a single token ID.'
             desc_ids = chosen_action
             chosen_action = chosen_action[0]
@@ -173,7 +172,6 @@ class EarlRequestTracker:
                     self.tools[req['mode']], req['chosen_ids'], chosen_action, interaction_kwargs
                 )
                 if chosen_action in self.tool_config.exit_action_ids or exiting:
-                    # breakpoint()
                     # exiting
                     results = self.tools[req['mode']].execute(req['chosen_ids'], chosen_action, interaction_kwargs)
                     output_template = self.tool_config.tool_name_to_output_template[req['mode']]
@@ -229,11 +227,8 @@ class EarlRequestTracker:
             return desc_ids, new_logprobs
         else:
             assert(self.tool_config.is_sft_mode,"sft")
-            # breakpoint()
             assert len(chosen_action) == 1, 'Chosen action must be a single token ID.'
             desc_ids = chosen_action
-            import pdb
-            # pdb.set_trace()
             chosen_action = chosen_action[0]
             if req_id not in self.running:
                 self.running[req_id] = {
@@ -307,7 +302,6 @@ class EarlRequestTracker:
                 self.tool_config, req['input_ids'] + [chosen_action]
             )
             if tool_name is not None:
-                # breakpoint()
                 # 4. record output for non-earl tool calls
                 tool = self.tools[tool_name]
                 results = tool.execute(tool_call_seq)
@@ -608,7 +602,6 @@ class EarlRollout(vLLMRollout):
             for req_data in scheduler_output.scheduled_cached_reqs:
                 req_id = req_data.req_id
                 req_state = self.requests[req_id]
-                # breakpoint()
                 # Update the cached states.
                 num_computed_tokens = req_data.num_computed_tokens
                 req_state.num_computed_tokens = num_computed_tokens
@@ -625,8 +618,6 @@ class EarlRollout(vLLMRollout):
                     tracker = self.earl_request_tracker.running[req_id]
                     if tracker['mode'] != 'default':
                         idx = tracker['last_write_idx'] 
-                        # if int(req_id) % 31 == 0:
-                        #     print(f"Runner id {req_id}: {new_tokens} -> {tracker['chosen_ids'][idx:]}")
                         # from the "translated" new tokens (by scheduler) to the actual action token
                         new_tokens = tracker['chosen_ids'][idx:]
                     if tracker['ending']:
@@ -718,30 +709,6 @@ class EarlRollout(vLLMRollout):
         model_to_patch.tool_config = tool_config
         model_to_patch.earl_request_tracker = self.earl_request_tracker
 
-        # FOR DEBUGGING: monkey patch model forward
-        # def custom_forward(
-        #     self,
-        #     input_ids: torch.Tensor,
-        #     positions: torch.Tensor,
-        #     intermediate_tensors = None,
-        #     inputs_embeds = None,
-        # ):
-        #     pattern = [16429, 29952, 25]
-        #     # Find all matches
-        #     indices = []
-        #     for i in range(len(input_ids) - len(pattern) + 1):
-        #         if torch.equal(input_ids[i:i+len(pattern)], torch.tensor(pattern, device=input_ids.device)):
-        #             indices.append(i)
-        #     # Print result
-        #     if len(indices) > 0:
-        #         print("Correct pattern found at indices:", indices)
-
-        #     hidden_states = self.model(input_ids, positions, intermediate_tensors,
-        #                             inputs_embeds)
-        #     return hidden_states
-        # model_to_patch = self.inference_engine.llm_engine.model_executor.driver_worker.worker.model_runner.model
-        # model_to_patch.forward = MethodType(custom_forward, model_to_patch)
-
         # Offload vllm model to reduce peak memory usage
         self.inference_engine.sleep(level=1)
 
@@ -760,7 +727,6 @@ class EarlRollout(vLLMRollout):
             if hasattr(SamplingParams(), str(k)):
                 kwargs[k] = config.get(k)
 
-        # print(f"kwargs: {kwargs}")
         self.sampling_params = SamplingParams(**kwargs)
 
         self.pad_token_id = tokenizer.pad_token_id
@@ -847,7 +813,6 @@ class EarlRollout(vLLMRollout):
                 lora_requests = [LoRARequest(lora_name=f"{lora_int_id}", lora_int_id=lora_int_id, lora_path="/simon-stub-path")] * batch_size
 
         # users can customize different sampling_params at different run
-        # breakpoint()
         with self.update_sampling_params(**kwargs):
             self.earl_request_tracker.clean()   # clean up prev requests
             outputs = self.inference_engine.generate(
@@ -872,11 +837,8 @@ class EarlRollout(vLLMRollout):
                     if len(output.outputs) == 1:
                         req_id = f"{output.request_id}"
                     else:
-                        # breakpoint()
                         req_id = f"{sample_id}_{output.request_id}"
                     assert req_id in self.earl_request_tracker.running
-                    # import pdb
-                    # pdb.set_trace()
                     req = self.earl_request_tracker.running[req_id]
                     req = cut_request_output(req, self.config.response_length)  # cut extra tokens, e.g., due to tool output
                     # extract info from output
@@ -903,7 +865,7 @@ class EarlRollout(vLLMRollout):
                         for i, logprob in enumerate(logprobs):
                             curr_log_prob.append(logprob[response_ids[i]].logprob)
                         rollout_log_probs.append(curr_log_prob)
-            # breakpoint()
+
             response = pad_2d_list_to_length(response, self.pad_token_id, max_length=self.config.response_length).to(idx.device)
             response_earl = pad_2d_list_to_length(response_earl, self.pad_token_id, max_length=self.config.response_length).to(idx.device)
             input = pad_2d_list_to_length(input, self.pad_token_id, max_length=self.config.response_length).to(idx.device)
@@ -949,7 +911,6 @@ class EarlRollout(vLLMRollout):
         attention_mask = torch.cat((attention_mask, response_attention_mask), dim=-1)
 
         # all the tp ranks should contain the same data here. data in all ranks are valid
-        # breakpoint()
         batch = TensorDict(
             {
                 "prompts": idx,
@@ -979,7 +940,6 @@ class EarlRollout(vLLMRollout):
             and self.config.free_cache_engine
         ):
             self.inference_engine.free_cache_engine()
-        # breakpoint()
         return DataProto(batch=batch, non_tensor_batch=non_tensor_batch)
     def _default_generate_sequences(self, prompts: DataProto, **kwargs) -> DataProto:
         # rebuild vllm cache engine
@@ -1115,7 +1075,7 @@ class EarlRollout(vLLMRollout):
                         for i, logprob in enumerate(logprobs):
                             curr_log_prob.append(logprob[response_ids[i]].logprob)
                         rollout_log_probs.append(curr_log_prob)
-            # breakpoint()
+
             response = pad_2d_list_to_length(response, self.pad_token_id, max_length=self.config.response_length).to(idx.device)
             response_earl = pad_2d_list_to_length(response_earl, self.pad_token_id, max_length=self.config.response_length).to(idx.device)
             input = pad_2d_list_to_length(input, self.pad_token_id, max_length=self.config.response_length).to(idx.device)
@@ -1165,7 +1125,6 @@ class EarlRollout(vLLMRollout):
         attention_mask = torch.cat((attention_mask, response_attention_mask), dim=-1)
 
         # all the tp ranks should contain the same data here. data in all ranks are valid
-        # breakpoint()
         batch = TensorDict(
             {
                 "prompts": idx,
@@ -1195,7 +1154,6 @@ class EarlRollout(vLLMRollout):
             and self.config.free_cache_engine
         ):
             self.inference_engine.free_cache_engine()
-        # breakpoint()
         return DataProto(batch=batch, non_tensor_batch=non_tensor_batch)
     @GPUMemoryLogger(role="vllm rollout spmd", logger=logger)
     @torch.no_grad()
@@ -1220,7 +1178,6 @@ class EarlRollout(vLLMRollout):
 
         # fill in the request
         # TODO: now hard-coded to use calculator and specific prompt format!!!
-        # breakpoint()
         self.earl_request_tracker.clean()   # clean up prev requests
         self.earl_request_tracker.init_requests(
             counter=0,
@@ -1230,7 +1187,6 @@ class EarlRollout(vLLMRollout):
             interaction_kwargs=non_tensor_batch.get("interaction_kwargs", None)
         )
         for i, prompt in enumerate(idx):
-            # breakpoint()
             gt = non_tensor_batch["expr"][i].replace(' ', '')
             self.earl_request_tracker.update_request(
                 req_id = str(i),
@@ -1256,12 +1212,6 @@ class EarlRollout(vLLMRollout):
                 logprobs=None
             )
             self.earl_request_tracker.set_default_mode(str(i))
-            # .
-            # self.earl_request_tracker.update_request(
-            #     req_id = str(i),
-            #     chosen_action = [13],
-            #     logprobs=None
-            # )
             # <|im_end|>
             self.earl_request_tracker.update_request(
                 req_id = str(i),
@@ -1330,7 +1280,6 @@ class EarlRollout(vLLMRollout):
             },
             batch_size=batch_size,
         )
-        # breakpoint()
         return DataProto(batch=batch, non_tensor_batch=non_tensor_batch)
     def _SFT_compute_gt_sequences(self, prompts: DataProto) -> DataProto:
         idx = prompts.batch["input_ids"]  # (bs, prompt_length)
@@ -1347,18 +1296,13 @@ class EarlRollout(vLLMRollout):
         tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2-7B-Instruct")
         # fill in the request
         # TODO: now hard-coded to use calculator and specific prompt format!!!
-        # breakpoint()
-        import pdb
-        # pdb.set_trace()
         self.earl_request_tracker.clean()   # clean up prev requests
         import re
         for i, prompt in enumerate(idx):
-            # breakpoint()
-            # pdb.set_trace()
             gt = non_tensor_batch["expr"][i]
             if '<answer>' in gt and '</answer>' in gt:
                 ''' countdown sft '''
-            # gt = " First, let's consider the numbers we have: 71, 5, 49, and 9. We need to find a combination of these numbers using basic arithmetic operations to get 165.\nLet's start by trying to combine the larger numbers first. \nIf we multiply 71 by 5, we get:\n<calculator>71 * 5</calculator>\n<result>355</result>\n355 is too large, so let's try another combination.\nIf we multiply 49 by 5, we get:\n<calculator>49 * 5</calculator>\n<result>245</result>\n245 is still too large, so let's try another combination.\nIf we multiply 71 by 9, we get:\n<calculator>71 * 9</calculator>\n<result>639</result>\n639 is too large, so let's try another combination.\nIf we multiply 49 by 9, we get:\n<calculator>49 * 9</calculator>\n<result>441</result>\n441 is too large, so let's try another combination.\nIf we add 71 and 49, we get:\n<calculator>71 + 49</calculator>\n<result>120</result>\n120 is closer to 165, so let's see if we can use the remaining numbers (5 and 9) to reach 165.\nIf we add 5 and 9, we get:\n<calculator>5 + 9</calculator>\n<result>14</result>\nIf we add 120 and 14, we get:\n<calculator>120 + 14</calculator>\n<result>134</result>\n134 is still not 165, so let's try another combination.\nIf we subtract 5 from 71, we get:\n<calculator>71 - 5</calculator>\n<result>66</result>\nIf we add 66 and 49, we get:\n<calculator>66 + 49</calculator>\n<result>115</result>\n115 is still not 165, so let's try another combination.\nIf we multiply 5 by 9, we get:\n<calculator>5 * 9</calculator>\n<result>45</result>\nIf we add 45 to 120, we get:\n<calculator>120 + 45</calculator>\n<result>165</result>\nSo, the equation that equals 165 is:\n71 + 49 + (5 * 9)</think>\n<answer>71 + 49 + (5 * 9)</answer>"
+                # gt = " First, let's consider the numbers we have: 71, 5, 49, and 9. We need to find a combination of these numbers using basic arithmetic operations to get 165.\nLet's start by trying to combine the larger numbers first. \nIf we multiply 71 by 5, we get:\n<calculator>71 * 5</calculator>\n<result>355</result>\n355 is too large, so let's try another combination.\nIf we multiply 49 by 5, we get:\n<calculator>49 * 5</calculator>\n<result>245</result>\n245 is still too large, so let's try another combination.\nIf we multiply 71 by 9, we get:\n<calculator>71 * 9</calculator>\n<result>639</result>\n639 is too large, so let's try another combination.\nIf we multiply 49 by 9, we get:\n<calculator>49 * 9</calculator>\n<result>441</result>\n441 is too large, so let's try another combination.\nIf we add 71 and 49, we get:\n<calculator>71 + 49</calculator>\n<result>120</result>\n120 is closer to 165, so let's see if we can use the remaining numbers (5 and 9) to reach 165.\nIf we add 5 and 9, we get:\n<calculator>5 + 9</calculator>\n<result>14</result>\nIf we add 120 and 14, we get:\n<calculator>120 + 14</calculator>\n<result>134</result>\n134 is still not 165, so let's try another combination.\nIf we subtract 5 from 71, we get:\n<calculator>71 - 5</calculator>\n<result>66</result>\nIf we add 66 and 49, we get:\n<calculator>66 + 49</calculator>\n<result>115</result>\n115 is still not 165, so let's try another combination.\nIf we multiply 5 by 9, we get:\n<calculator>5 * 9</calculator>\n<result>45</result>\nIf we add 45 to 120, we get:\n<calculator>120 + 45</calculator>\n<result>165</result>\nSo, the equation that equals 165 is:\n71 + 49 + (5 * 9)</think>\n<answer>71 + 49 + (5 * 9)</answer>"
                 expr = gt.split('<answer>')[1].split('</answer>')[0].strip()
                 format_expr = ''
                 for char in expr.replace(' ', ''):
@@ -1387,8 +1331,6 @@ class EarlRollout(vLLMRollout):
                             if j == 0:
                                 inter_expr = ans_chunk.replace(' ', '').replace('\n','')
                                 # 71*5
-                                # if 'So' in inter_expr:
-                                #     pdb.set_trace()
                                 for char in inter_expr:
                                     token_id = None
                                     for key, val in self.tool_config.tool_action_id_to_non_earl_actions[-1].items():
@@ -1446,71 +1388,6 @@ class EarlRollout(vLLMRollout):
                     logprobs=None
                 )
 
-                    # expr = gt.split('<answer>')[1].split('</answer>')[0].strip()
-                    # temp_str = ''
-                    # for item in gt.replace('\n\n',' \n').replace('<calculator>',' <calculator> ').replace('</calculator>',' </calculator> ').replace('</think>', ' </think> ').replace('<think>\n',' ').replace('<answer>',' <answer> ').replace('</answer>',' </answer> ').split('<result>'):
-                    #     item_list = item.split('</result>')
-                    #     if len(item_list) == 1:
-                    #         temp_str += item_list[0]
-                    #     elif len(item_list) == 2:
-                    #         temp_str += item_list[1]
-                    #     else:
-                    #         for chk in item_list:
-                    #             if not chk.strip().isdigit():
-                    #                 temp_str += chk
-
-                    # temp_str = temp_str.replace('\n\n',' \n')
-                    # temp_str = ' ' + ' '.join(temp_str.replace('\n', ' \n ').split())
-                    # format_str = ''
-                    # for item in re.split(f'({re.escape(" <calculator> ")})', temp_str):
-                    #     if ' </calculator> ' in item:
-                    #         temp_list = re.split(f'({re.escape(" </calculator> ")})', item)
-                    #         for j in range(len(temp_list)):
-                    #             temp = temp_list[j]
-                    #             if j == 0: 
-                    #                 for char in temp.replace(' ', ''):
-                    #                     # if char != ',': # <calculator> 119,566 * 264 </calculator>\
-                    #                     if char in ['+','-','*','/', '(', ')']: # convert to correct subword of token id
-                    #                         format_str += ' ' + char
-                    #                     else:
-                    #                         format_str += char
-                    #             else:
-                    #                 format_str += temp
-                    #     else:
-                    #         format_str += item
-                    # gt_list = re.split(f'({re.escape(expr)})', format_str)
-                    # # print(gt_list)
-                    # for gt_element in gt_list:
-                    #     if gt_element == expr:
-                    #         gt_element_inputs = gt_element.replace(' ', '')
-                    #         for char in gt_element_inputs:
-                    #             token_id = None
-                    #             for key, val in self.tool_config.tool_action_id_to_non_earl_actions[-1].items():
-                    #                 if char in key:
-                    #                     token_id = val
-                    #                     break
-                    #             assert token_id is not None, f"Character {char} not found in tool config id_to_str mapping."
-                    #             self.earl_request_tracker.update_request(
-                    #                 req_id = str(i),
-                    #                 chosen_action = [token_id],
-                    #                 logprobs=None
-                    #             )
-                    #     else:
-                    #         # pdb.set_trace()
-                    #         gt_element = gt_element.replace('+',' +').replace('-',' -').replace('*',' *').replace('/',' /').replace( '(', ' (').replace( ')', ' )')
-                    #         gt_element_input_token_ids = tokenizer.encode(gt_element)
-                    #         for token_id in gt_element_input_token_ids:
-                    #             self.earl_request_tracker.update_request(
-                    #                 req_id = str(i),
-                    #                 chosen_action = [token_id],
-                    #                 logprobs=None
-                    #             )
-                    # self.earl_request_tracker.update_request(
-                    #     req_id = str(i),
-                    #     chosen_action = [151645],
-                    #     logprobs=None
-                    # ) 
-
             else:
                 ''' arithmetic sft '''
                 ans = '\n' + non_tensor_batch["expr"][i].split('\n')[1]
@@ -1542,51 +1419,6 @@ class EarlRollout(vLLMRollout):
                     chosen_action = [151645],
                     logprobs=None
                 )    
-            # self.earl_request_tracker.set_default_mode(str(i))
-            # self.earl_request_tracker.update_request(
-            #     req_id = str(i),
-            #     chosen_action = [13],
-            #     logprobs=None
-            # )
-
-            # gt = non_tensor_batch["extra_info"]["answer"][i].replace(' ', '')
-            # self.earl_request_tracker.update_request(
-            #     req_id = str(i),
-            #     chosen_action = [self.tool_config.tool_action_ids[0]],
-            #     logprobs=None
-            # )
-            
-            # for char in gt:
-            #     token_id = None
-            #     for key, val in self.tool_config.id_to_str.items():
-            #         if char in val:
-            #             token_id = key
-            #             break
-            #     assert token_id is not None, f"Character {char} not found in tool config id_to_str mapping."
-            #     self.earl_request_tracker.update_request(
-            #         req_id = str(i),
-            #         chosen_action = [token_id],
-            #         logprobs=None
-            #     )
-            # pdb.set_trace()
-            
-            # pdb.set_trace()
-            # self.earl_request_tracker.update_request(
-            #     req_id = str(i),
-            #     chosen_action = [self.tool_config.exit_action_ids[0]],
-            #     logprobs=None
-            # )
-            
-            # self.earl_request_tracker.set_default_mode(str(i))
-
-            # self.earl_request_tracker.update_request(
-            #     req_id = str(i),
-            #     chosen_action = [151645],
-            #     logprobs=None
-            # )
-
-        # breakpoint()
-        # pdb.set_trace()
         response = []
         response_earl = []
         input = []
@@ -1648,17 +1480,6 @@ class EarlRollout(vLLMRollout):
             },
             batch_size=batch_size,
         )
-        # breakpoint()
-        
-        # print(tokenizer.batch_decode(batch['prompts']))
-        # print(tokenizer.batch_decode(batch["responses"]))
-        # print(tokenizer.batch_decode(batch["input_ids"]))
-        # print(tokenizer.batch_decode(batch["response_earl"]))
-        # pdb.set_trace()
-        # tokenizer.batch_decode(batch['prompts'])
-        # tokenizer.batch_decode(batch["responses"][0][:26])
-        # tokenizer.batch_decode(batch[])
-        # tokenizer.batch_decode(batch[])
         return DataProto(batch=batch, non_tensor_batch=non_tensor_batch)
     @GPUMemoryLogger(role="gt rollout", logger=logger)
     @torch.no_grad()
@@ -1724,7 +1545,6 @@ class EarlRollout(vLLMRollout):
                     prompts.batch['call_tool_pos'][i])
                 } for i in range(batch_size)
             ]
-            # breakpoint()
 
             # ensure the type of `prompt_token_ids` passed to vllm is list[int]
             # https://github.com/volcengine/verl/pull/772
@@ -1746,18 +1566,14 @@ class EarlRollout(vLLMRollout):
                     lora_requests = [LoRARequest(lora_name=f"{lora_int_id}", lora_int_id=lora_int_id, lora_path="/simon-stub-path")] * batch_size
 
             # users can customize different sampling_params at different run
-            # breakpoint()
             rewrite_interaction_kwargs = non_tensor_batch.get("interaction_kwargs", None)
             if rewrite_interaction_kwargs is not None:
                 rewrite_interaction_kwargs = rewrite_interaction_kwargs[mask.bool().cpu().tolist()]
             # prev_seq = [prompts.batch['response_earl'][i][:prev].tolist() for i, prev in enumerate(old_response_lengths)]
-            # breakpoint()
             prev_seq = [prompts.batch['response_earl'][i][:prev][prompts.batch['seq_mask'][i][:prev].bool()].cpu().tolist() for i, prev in enumerate(old_response_lengths)]
             with self.update_sampling_params(**kwargs):
                 with self.update_vllm_sampler(starting_mode=starting_mode):
-                    # try:
                     self.earl_request_tracker.clean()   # clean up prev requests
-                    # breakpoint()
                     self.earl_request_tracker.init_requests(
                         counter=self.inference_engine.request_counter.counter,
                         bsz=batch_size,
@@ -1771,9 +1587,6 @@ class EarlRollout(vLLMRollout):
                         lora_request=lora_requests,
                         use_tqdm=False,
                     )
-                    # except Exception as e:
-                    #     print(e)
-                    #     breakpoint()
 
                 # TODO(sgm): disable logprob when recompute_log_prob is enable
                 # if n = 1: (bs, response_length) ; if n > 1: (bs * n, response_length)
@@ -1789,7 +1602,6 @@ class EarlRollout(vLLMRollout):
                         if len(output.outputs) == 1:
                             req_id = f"{output.request_id}"
                         else:
-                            # breakpoint()
                             req_id = f"{sample_id}_{output.request_id}"
                         assert req_id in self.earl_request_tracker.running
                         sample = prompts.batch[i]
@@ -1823,7 +1635,6 @@ class EarlRollout(vLLMRollout):
                             ), dim=0
                         )
                         earl_action_mask.append(seq_action_masks)
-                # breakpoint()
                 # pad list of tensor of variable lengths -> tensor with fixed length
                 response = pad_2d_list_to_length(response, self.pad_token_id, max_length=self.config.response_length).to(idx.device)
                 response_earl = pad_2d_list_to_length(response_earl, self.pad_token_id, max_length=self.config.response_length).to(idx.device)
@@ -1833,7 +1644,6 @@ class EarlRollout(vLLMRollout):
                 earl_action_mask = pad_and_stack_masks(earl_action_mask, True, max_length=self.config.response_length).to(idx.device)
                 seq = torch.cat([idx, input], dim=-1)
             
-            # breakpoint()
             response_length = response.size(1)
             delta_position_id = torch.arange(1, response_length + 1, device=position_ids.device)
             delta_position_id = delta_position_id.unsqueeze(0).expand(batch_size, -1)
@@ -1861,7 +1671,6 @@ class EarlRollout(vLLMRollout):
             interaction_kwargs_list = None
 
         # all the tp ranks should contain the same data here. data in all ranks are valid
-        # breakpoint()
         
         def combine(t1, t2, mask):
             """
@@ -1901,7 +1710,6 @@ class EarlRollout(vLLMRollout):
             and self.config.free_cache_engine
         ):
             self.inference_engine.free_cache_engine()
-        # breakpoint()
         non_tensor_batch['interaction_kwargs'][mask.bool().cpu().numpy()] = np.array(interaction_kwargs_list)
         return DataProto(batch=batch, non_tensor_batch=non_tensor_batch)
     def _SFT_rewrite_sequences(self, prompts: DataProto, mask: torch.Tensor) -> DataProto:
@@ -1958,7 +1766,6 @@ class EarlRollout(vLLMRollout):
                     prompts.batch['call_tool_pos'][i])
                 } for i in range(batch_size)
             ]
-            # breakpoint()
 
             # ensure the type of `prompt_token_ids` passed to vllm is list[int]
             # https://github.com/volcengine/verl/pull/772
@@ -1980,7 +1787,6 @@ class EarlRollout(vLLMRollout):
                     lora_requests = [LoRARequest(lora_name=f"{lora_int_id}", lora_int_id=lora_int_id, lora_path="/simon-stub-path")] * batch_size
 
             # users can customize different sampling_params at different run
-            # breakpoint()
             with self.update_sampling_params(**kwargs):
                 with self.update_vllm_sampler(starting_mode=starting_mode):
                     # try:
@@ -1991,9 +1797,6 @@ class EarlRollout(vLLMRollout):
                         lora_request=lora_requests,
                         use_tqdm=False,
                     )
-                    # except Exception as e:
-                    #     print(e)
-                    #     breakpoint()
 
                 # TODO(sgm): disable logprob when recompute_log_prob is enable
                 # if n = 1: (bs, response_length) ; if n > 1: (bs * n, response_length)
@@ -2009,7 +1812,6 @@ class EarlRollout(vLLMRollout):
                         if len(output.outputs) == 1:
                             req_id = f"{output.request_id}"
                         else:
-                            # breakpoint()
                             req_id = f"{sample_id}_{output.request_id}"
                         assert req_id in self.earl_request_tracker.running
                         sample = prompts.batch[i]
@@ -2050,7 +1852,6 @@ class EarlRollout(vLLMRollout):
                 earl_action_mask = pad_and_stack_masks(earl_action_mask, True, max_length=self.config.response_length).to(idx.device)
                 seq = torch.cat([idx, input], dim=-1)
             
-            # breakpoint()
             response_length = response.size(1)
             delta_position_id = torch.arange(1, response_length + 1, device=position_ids.device)
             delta_position_id = delta_position_id.unsqueeze(0).expand(batch_size, -1)
@@ -2077,7 +1878,6 @@ class EarlRollout(vLLMRollout):
             earl_action_mask = None
 
         # all the tp ranks should contain the same data here. data in all ranks are valid
-        # breakpoint()
         
         def combine(t1, t2, mask):
             """
@@ -2117,7 +1917,6 @@ class EarlRollout(vLLMRollout):
             and self.config.free_cache_engine
         ):
             self.inference_engine.free_cache_engine()
-        # breakpoint()
         return DataProto(batch=batch, non_tensor_batch=non_tensor_batch)
 
     @GPUMemoryLogger(role="vllm rewrite rollout", logger=logger)
@@ -2137,5 +1936,4 @@ class EarlRollout(vLLMRollout):
         sampler.starting_mode = starting_mode
         yield
         # roll back to previous sampling params
-        # if len(old_sampling_params_args):
         sampler.starting_mode = old_starting_mode

@@ -20,12 +20,7 @@ def create_earl_head(base_model, tool_config, model_config, dtype):
                 id = tool_config.org_vocab_size + i
                 original_ids = tool_config.id_to_seq[id]
                 init_weight_with = tool_config.id_to_init_weight[id]
-                # breakpoint()
                 with torch.no_grad():
-                    # init_weights[i].copy_(
-                    #     torch.mean(base_model.lm_head.weight[original_ids], dim=0).detach()
-                    # )
-                    # if id not in tool_config.tool_action_ids:
                     init_weights[i].copy_(
                         base_model.lm_head.weight[original_ids[init_weight_with]].detach()
                     )

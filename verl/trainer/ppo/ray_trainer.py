@@ -216,7 +216,6 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
         DataProto: The updated data with computed advantages and returns.
     """
     # Back-compatible with trainers that do not compute response mask in fit
-    # breakpoint()
     if "response_mask" not in data.batch.keys():
         data.batch["response_mask"] = compute_response_mask(data)
     # prepare response group
@@ -504,7 +503,6 @@ class RayPPOTrainer:
         if val_dataset is None:
             val_dataset = create_rl_dataset(self.config.data.val_files, self.config.data, self.tokenizer, self.processor)
         self.train_dataset, self.val_dataset = train_dataset, val_dataset
-        # breakpoint()
         if train_sampler is None:
             train_sampler = create_rl_sampler(self.config.data, self.train_dataset)
         if collate_fn is None:
@@ -668,11 +666,9 @@ class RayPPOTrainer:
                 test_output_gen_batch_padded = self.async_rollout_manager.generate_sequences(test_gen_batch_padded)
                 self.async_rollout_manager.sleep()
 
-            # breakpoint()
             # unpad
             test_output_gen_batch = unpad_dataproto(test_output_gen_batch_padded, pad_size=pad_size)
             print("validation generation end")
-            # breakpoint()
             # Store generated outputs
             output_ids = test_output_gen_batch.batch["responses"]
             output_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in output_ids]
@@ -992,7 +988,6 @@ class RayPPOTrainer:
                 )
 
                 is_last_step = self.global_steps >= self.total_training_steps
-                # breakpoint()
                 with marked_timer("step", timing_raw):
                     # generate a batch
                     with marked_timer("gen", timing_raw, color="red"):
@@ -1026,7 +1021,6 @@ class RayPPOTrainer:
                     # repeat to align with repeated responses in rollout
                     batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
                     batch = batch.union(gen_batch_output)
-                    # breakpoint()
                     batch.batch["response_mask"] = compute_response_mask(batch)
                     # Balance the number of valid tokens across DP ranks.
                     # NOTE: This usually changes the order of data in the `batch`,
@@ -1050,7 +1044,6 @@ class RayPPOTrainer:
                         else:
                             reward_tensor, reward_extra_infos_dict = compute_reward(batch, self.reward_fn)
 
-                    # breakpoint()
                     # recompute old_log_probs
                     with marked_timer("old_log_prob", timing_raw, color="blue"):
                         old_log_prob = self.actor_rollout_wg.compute_log_prob(batch)
@@ -1101,7 +1094,6 @@ class RayPPOTrainer:
                         with marked_timer("values", timing_raw, color="cyan"):
                             values = self.critic_wg.compute_values(batch)
                             batch = batch.union(values)
-                    # breakpoint()
 
                     with marked_timer("adv", timing_raw, color="brown"):
                         # we combine with rule-based rm
@@ -1139,8 +1131,6 @@ class RayPPOTrainer:
                             max_response_length = batch.batch["responses"].shape[-1]
                             valid_mask = batch.batch["attention_mask"][:, -max_response_length:]
                             batch.batch['returns'] = batch.batch['token_level_rewards'].sum(dim=-1).unsqueeze(-1) * valid_mask
-                            # breakpoint()
-                    # breakpoint()
 
                     # update critic
                     if self.use_critic:
@@ -1149,7 +1139,6 @@ class RayPPOTrainer:
                         critic_output_metrics = reduce_metrics(critic_output.meta_info["metrics"])
                         metrics.update(critic_output_metrics)
 
-                    # breakpoint()
 
                     # implement critic warmup
                     if self.config.trainer.critic_warmup <= self.global_steps:
@@ -1182,7 +1171,6 @@ class RayPPOTrainer:
                     if critic_data_dir and self.global_steps % log_critic_freq == 0:
                         with marked_timer("dump_critic_evaluations", timing_raw, color="green"):
                             # print(batch.batch.keys())
-                            # breakpoint()
                             os.makedirs(critic_data_dir, exist_ok=True)
                             data_dict = {
                                 "prompts": self.tokenizer.batch_decode(batch.batch["prompts"], skip_special_tokens=True),
@@ -1199,7 +1187,6 @@ class RayPPOTrainer:
                             if is_last_step:
                                 last_val_metrics = val_metrics
                         metrics.update(val_metrics)
-                        # breakpoint()
 
                     if self.config.trainer.save_freq > 0 and (is_last_step or self.global_steps % self.config.trainer.save_freq == 0):
                         with marked_timer("save_checkpoint", timing_raw, color="green"):

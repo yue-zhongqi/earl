@@ -83,8 +83,6 @@ class EarlActor(DataParallelPPOActor):
         Returns:
             torch.Tensor: the log_prob tensor
         """
-        # breakpoint()
-        # set to eval
         self.actor_module.eval()
 
         micro_batch_size = data.meta_info["micro_batch_size"]
@@ -135,7 +133,6 @@ class EarlActor(DataParallelPPOActor):
             if isinstance(micro_batch, DataProto):
                 micro_batch = {**micro_batch.batch, **micro_batch.non_tensor_batch}
             with torch.no_grad():
-            # with torch.inference_mode():
                 entropy, log_probs = self._forward_micro_batch(
                     micro_batch, temperature=temperature, calculate_entropy=calculate_entropy, force_label=force_label
                 )
@@ -216,7 +213,6 @@ class EarlActor(DataParallelPPOActor):
                     self.gradient_accumulation = self.config.ppo_mini_batch_size // self.config.ppo_micro_batch_size_per_gpu
                     # split batch into micro_batches
                     micro_batches = mini_batch.split(self.config.ppo_micro_batch_size_per_gpu)
-                # breakpoint()
                 self.actor_optimizer.zero_grad()
 
                 for data in micro_batches:
@@ -262,7 +258,6 @@ class EarlActor(DataParallelPPOActor):
                     )
 
                     loss_mode = self.config.policy_loss.get("loss_mode", "vanilla")
-                    # breakpoint()
                     earl_tool_mask = (earl_ref_log_prob != 0.0)
                     pg_mask = torch.logical_and(earl_tool_mask, response_mask)
                     if self.config.policy_loss.loss_mode == "vanilla":
@@ -296,7 +291,6 @@ class EarlActor(DataParallelPPOActor):
 
                     if self.config.use_kl_loss:
                         ref_log_prob = data["ref_log_prob"]
-                        # breakpoint()
                         # get the mask where earl_ref_log_prob is zero
                         earl_ref_mask = (earl_ref_log_prob != 0.0)
                         kl_mask = torch.logical_and(earl_ref_mask, response_mask)
@@ -313,7 +307,6 @@ class EarlActor(DataParallelPPOActor):
                         loss = policy_loss * (len(data) / self.config.ppo_mini_batch_size)
                     else:
                         loss = policy_loss / self.gradient_accumulation
-                    # breakpoint()
                     loss.backward()
                     data = {
                         "actor/pg_loss": pg_loss.detach().item(),
@@ -334,7 +327,6 @@ class EarlActor(DataParallelPPOActor):
         assert len(insert_ids) >= 1
         model = self.actor_module
         device = input_ids.device
-        # log_probs = []
 
         bsz = len(input_ids)
         input_ids = input_ids.unsqueeze(0)
@@ -345,8 +337,6 @@ class EarlActor(DataParallelPPOActor):
         logits = out.logits
         if logits_mask is not None:
             logits.masked_fill_(~logits_mask, float("-inf"))
-        # breakpoint()
-        # logp = logits.log_softmax(dim=-1)[0, :, insert_ids[0]]
         logp = logprobs_from_logits(
             logits=logits[0],
             labels=torch.tensor(insert_ids[0]).to(logits.device).repeat(logits.shape[1]),
@@ -363,7 +353,6 @@ class EarlActor(DataParallelPPOActor):
 
         if len(insert_ids) > 1:
             chunk_sizes = get_dynamic_chunk_size(bsz, max_chunk_size=128)
-            # print(chunk_sizes)
             pos = torch.arange(bsz, device=device).unsqueeze(1)
             attn_mask = torch.tril(torch.ones((bsz, bsz), dtype=torch.bool, device=device))
             c = 0
@@ -383,7 +372,6 @@ class EarlActor(DataParallelPPOActor):
                 for i in range(0, len(insert_ids)-1):
                     attn_mask_c = torch.cat((attn_mask_c, true_mask), dim=1)  # add a True column for the new token
                     input_ids = torch.tensor(insert_ids[i:i+1], device=device).unsqueeze(0).repeat(csz,1)
-                    # breakpoint()
                     out = model(
                         input_ids=input_ids,
                         attention_mask=attn_mask_c,
@@ -394,8 +382,6 @@ class EarlActor(DataParallelPPOActor):
                     logits = out.logits
                     if logits_mask is not None:
                         logits.masked_fill_(~logits_mask, float("-inf"))
-                    # logp = logits.log_softmax(dim=-1)[:, 0, insert_ids[i+1]]
-                    # breakpoint()
                     logp[c:c+chunk_size] += logprobs_from_logits(
                         logits=logits,
                         labels=torch.tensor(insert_ids[i+1]).to(logits.device).repeat(logits.shape[0]),
@@ -438,7 +424,6 @@ class EarlActor(DataParallelPPOActor):
             scores = []
             for sample in data.batch:
                 input_mask = sample['attention_mask'].bool()
-                # breakpoint()
                 non_tool_mask = sample['insertable_mask'].bool()
                 
                 # get first True position in non_tool_mask
@@ -480,7 +465,6 @@ class EarlActor(DataParallelPPOActor):
 
                 scores.append(full_log_probs)
             scores = torch.stack(scores, dim=0)  # shape (bsz, seqlen)
-        # breakpoint()
         return scores
     
     @GPUMemoryLogger(role="earl actor", logger=logger)
@@ -506,8 +490,6 @@ class EarlActor(DataParallelPPOActor):
             # logical and non_tool_mask, non_tool_mask_l, and input_mask
 
             output_mask = non_tool_mask & non_tool_mask_l
-            # breakpoint()
-            # assert output_mask.sum() > 0
 
             # prepare logits mask
             org_vocab_action_mask = torch.ones(org_vocab_size, dtype=torch.bool, device=input_mask.device)
@@ -532,9 +514,7 @@ class EarlActor(DataParallelPPOActor):
             full_log_probs[input_mask] = log_probs
 
             scores.append(full_log_probs)
-        # breakpoint()
         scores = torch.stack(scores, dim=0)  # shape (bsz, seqlen)
-        # torch.distributed.barrier()
         return scores
 
     def _forward_micro_batch(self, micro_batch, temperature, calculate_entropy=False, return_earl_ref=False, force_label=None) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -661,8 +641,6 @@ class EarlActor(DataParallelPPOActor):
                 # hidden_states = output.hidden_states[-1]  # (1, total_nnz, hidden_size)
                 # tool_logits = self.earl_head(hidden_states)
                 if self.use_fused_kernels:
-                    # log_probs = output.log_probs.squeeze(0)  # (total_nnz,)
-                    # entropy_rmpad = output.entropy.squeeze(0)  # (total_nnz,)
                     raise NotImplementedError("Fused kernels are not supported in EarlActor yet.")
                 else:
                     logits_rmpad = output.logits.squeeze(0)  # (total_nnz, vocab_size)
@@ -688,7 +666,6 @@ class EarlActor(DataParallelPPOActor):
                         )   # uses flash attn optimization
                         earl_ref_log_probs_full = torch.zeros_like(response_rmpad_rolled, dtype=earl_ref_log_probs.dtype)
                         earl_ref_log_probs_full[earl_ref_mask] = earl_ref_log_probs
-                        # breakpoint()
 
                     # apply action mask
                     org_vocab_action_mask = ~tool_mask_rolled.unsqueeze(-1)  # if tool_mask is True, then org vocab is not allowed
@@ -715,7 +692,6 @@ class EarlActor(DataParallelPPOActor):
                         tool_size=tool_size,
                     )   # compute location wiith tool_mask=True and False separately to prevent NaN output from flash attn chunking
                     log_probs.masked_fill_(~seq_mask_rolled, 0.0)
-                    # breakpoint()
 
                     # compute entropy
                     if calculate_entropy:
@@ -726,24 +702,9 @@ class EarlActor(DataParallelPPOActor):
                                 self.entropy_from_logits, logits_rmpad, logits_mask
                             )
                         entropy_rmpad.masked_fill_(~seq_mask_rolled, 0.0)
-                # breakpoint()
 
                 # gather log_prob if sp > 1
                 if self.use_ulysses_sp:
-                    # gather and unpad for the ulysses sp
-                    # log_probs = gather_outpus_and_unpad(
-                    #     log_probs,
-                    #     gather_dim=0,
-                    #     unpad_dim=0,
-                    #     padding_size=pad_size,
-                    # )
-                    # if calculate_entropy:
-                    #     entropy_rmpad = gather_outpus_and_unpad(
-                    #         entropy_rmpad,
-                    #         gather_dim=0,
-                    #         unpad_dim=0,
-                    #         padding_size=pad_size,
-                    #     )
                     raise NotImplementedError("Ulysses SP is not supported in EarlActor yet.")
                 # pad back to (bsz, seqlen)
                 if calculate_entropy:
@@ -774,32 +735,6 @@ class EarlActor(DataParallelPPOActor):
                     )
                     earl_ref_log_probs_full = earl_ref_log_probs_full.squeeze(-1)[:, -response_length - 1 : -1]
             else:  # not using rmpad and no ulysses sp
-                # extra_args = {}
-                # if self.use_fused_kernels:
-                #     extra_args["temperature"] = temperature
-                #     extra_args["return_dict"] = True
-
-                # output = self.actor_module(
-                #     input_ids=input_ids,
-                #     attention_mask=attention_mask,
-                #     position_ids=position_ids,
-                #     **multi_modal_inputs,
-                #     use_cache=False,
-                #     **extra_args,
-                # )  # prevent model thinks we are generating
-
-                # if self.use_fused_kernels:
-                #     log_probs = output.log_probs[:, -response_length - 1 : -1]
-                #     entropy = output.entropy[:, -response_length - 1 : -1]  # (bsz, response_length)
-
-                # else:
-                #     logits = output.logits
-
-                #     logits.div_(temperature)
-                #     logits = logits[:, -response_length - 1 : -1, :]  # (bsz, response_length, vocab_size)
-                #     log_probs = logprobs_from_logits(logits, micro_batch["responses"])
-                #     if calculate_entropy:
-                #         entropy = verl_F.entropy_from_logits(logits)  # (bsz, response_length)
                 raise NotImplementedError("EarlActor does not support non-rmpad and non-ulysses sp yet.")
             if return_earl_ref:
                 return entropy, log_probs, earl_ref_log_probs_full

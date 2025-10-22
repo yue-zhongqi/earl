@@ -27,7 +27,6 @@ class EarlVLLMScheduler(Scheduler):
         self.tool_config = tool_config
         self.tools = tools
         self.earl_request_tracker = request_tracker
-        # breakpoint()
 
     def update_from_output(
         self,
@@ -102,10 +101,8 @@ class EarlVLLMScheduler(Scheduler):
                 new_logprobs = logprobs.slice(req_index, req_index + 1)
             else:
                 new_logprobs = None
-            # print(new_token_ids)
             if new_token_ids:
                 prior_update = new_token_ids
-                # breakpoint()
                 new_token_ids, new_logprobs = self.earl_request_tracker.update_request(
                     req_id, new_token_ids, new_logprobs
                 )
